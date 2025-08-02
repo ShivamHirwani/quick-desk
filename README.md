@@ -80,7 +80,7 @@ Before setting up the project locally, ensure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone (https://github.com/ShivamHirwani/quick-desk.git)
+git clone https://github.com/ShivamHirwani/quick-desk.git
 cd quick-desk
 ```
 
