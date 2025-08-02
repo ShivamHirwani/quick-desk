@@ -2,6 +2,16 @@
 
 A modern, full-featured helpdesk system built with Next.js 15, Supabase, and TypeScript. This system provides a comprehensive solution for managing customer support tickets with role-based access control.
 
+## 🛠️ Technology Stack
+
+- **Frontend**: Next.js 15 with App Router, React 18, TypeScript
+- **Backend**: Next.js API Routes, Server Actions
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Custom authentication with Supabase
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **Icons**: Lucide React
+
+  
 ## 🚀 Features
 
 ### ✅ Implemented Features
@@ -58,14 +68,6 @@ A modern, full-featured helpdesk system built with Next.js 15, Supabase, and Typ
 - File attachment upload functionality
 - Advanced reporting and analytics
 
-## 🛠️ Technology Stack
-
-- **Frontend**: Next.js 15 with App Router, React 18, TypeScript
-- **Backend**: Next.js API Routes, Server Actions
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Custom authentication with Supabase
-- **Styling**: Tailwind CSS with shadcn/ui components
-- **Icons**: Lucide React
 
 ## 📋 Prerequisites
 
