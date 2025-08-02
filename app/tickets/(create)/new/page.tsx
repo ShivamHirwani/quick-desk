@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Upload } from "lucide-react"
+import { Loader2, Upload, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function NewTicketPage() {
   const [user, setUser] = useState(null)
@@ -36,6 +37,10 @@ export default function NewTicketPage() {
         if (userRes.ok) {
           const userData = await userRes.json()
           setUser(userData.user)
+        } else {
+          // Redirect to login if not authenticated
+          router.push("/login")
+          return
         }
 
         if (categoriesRes.ok) {
@@ -44,11 +49,12 @@ export default function NewTicketPage() {
         }
       } catch (error) {
         console.error("Failed to fetch data:", error)
+        setError("Failed to load page data")
       }
     }
 
     fetchData()
-  }, [])
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,6 +99,16 @@ export default function NewTicketPage() {
       <Navbar user={user} />
 
       <div className="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {/* Back button */}
+        <div className="mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Link>
+          </Button>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Create New Ticket</CardTitle>
@@ -179,7 +195,7 @@ export default function NewTicketPage() {
             </CardContent>
 
             <div className="flex justify-end gap-4 p-6 border-t">
-              <Button type="button" variant="outline" onClick={() => router.back()}>
+              <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading}>
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
