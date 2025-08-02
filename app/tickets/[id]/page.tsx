@@ -1,304 +1,200 @@
+import { notFound } from "next/navigation"
 import { requireAuth } from "@/lib/auth"
 import { supabase } from "@/lib/supabase"
 import { Navbar } from "@/components/navbar"
-import { TicketActions } from "@/components/ticket-actions"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { Calendar, Clock, Tag, User, Users, ArrowLeft, AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { TicketActions } from "@/components/ticket-actions"
+import { TicketComments } from "@/components/ticket-comments"
+import { ArrowLeft, Calendar, User, Tag, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
 
-interface TicketDetailPageProps {
-  params: Promise<{
+interface TicketPageProps {
+  params: {
     id: string
-  }>
+  }
 }
 
-export default async function TicketDetailPage({ params }: TicketDetailPageProps) {
-  try {
-    const user = await requireAuth()
-    const { id } = await params
+export default async function TicketPage({ params }: TicketPageProps) {
+  const user = await requireAuth()
+  const ticketId = params.id
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(id)) {
-      console.log("Invalid UUID format:", id)
-      notFound()
+  // Fetch ticket with related data
+  const { data: ticket, error } = await supabase
+    .from("tickets")
+    .select(`
+      *,
+      categories (id, name, color),
+      users!tickets_user_id_fkey (id, full_name, email),
+      users!tickets_assigned_agent_id_fkey (id, full_name, email)
+    `)
+    .eq("id", ticketId)
+    .single()
+
+  if (error || !ticket) {
+    notFound()
+  }
+
+  // Check if user has access to this ticket
+  const hasAccess =
+    user.role === "admin" || user.role === "agent" || ticket.user_id === user.id || ticket.assigned_agent_id === user.id
+
+  if (!hasAccess) {
+    notFound()
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "open":
+        return "bg-red-100 text-red-800"
+      case "in_progress":
+        return "bg-yellow-100 text-yellow-800"
+      case "resolved":
+        return "bg-green-100 text-green-800"
+      case "closed":
+        return "bg-gray-100 text-gray-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
+  }
 
-    // Fetch the ticket with all related data
-    const { data: ticket, error: ticketError } = await supabase
-      .from("tickets")
-      .select(`
-        *,
-        categories (
-          id,
-          name,
-          color
-        ),
-        users!tickets_user_id_fkey (
-          id,
-          full_name,
-          email
-        ),
-        assigned_agent:users!tickets_assigned_agent_id_fkey (
-          id,
-          full_name,
-          email
-        )
-      `)
-      .eq("id", id)
-      .single()
-
-    if (ticketError) {
-      console.error("Ticket fetch error:", ticketError)
-      notFound()
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "urgent":
+        return "bg-red-100 text-red-800"
+      case "high":
+        return "bg-orange-100 text-orange-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "low":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
+  }
 
-    if (!ticket) {
-      console.log("No ticket found with ID:", id)
-      notFound()
-    }
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar user={user} />
 
-    // Check permissions - users can only view their own tickets, agents/admins can view all
-    if (user.role === "user" && ticket.user_id !== user.id) {
-      console.log("Permission denied: user trying to access ticket they don't own")
-      notFound()
-    }
-
-    // Fetch agents list for assignment (only for agents/admins)
-    let agents = []
-    if (["agent", "admin"].includes(user.role)) {
-      const { data: agentsData } = await supabase
-        .from("users")
-        .select("id, full_name, email")
-        .in("role", ["agent", "admin"])
-        .order("full_name")
-      agents = agentsData || []
-    }
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case "open":
-          return "bg-red-100 text-red-800"
-        case "in_progress":
-          return "bg-yellow-100 text-yellow-800"
-        case "resolved":
-          return "bg-green-100 text-green-800"
-        case "closed":
-          return "bg-gray-100 text-gray-800"
-        default:
-          return "bg-gray-100 text-gray-800"
-      }
-    }
-
-    const getPriorityColor = (priority: string) => {
-      switch (priority) {
-        case "urgent":
-          return "bg-red-100 text-red-800"
-        case "high":
-          return "bg-orange-100 text-orange-800"
-        case "medium":
-          return "bg-yellow-100 text-yellow-800"
-        case "low":
-          return "bg-green-100 text-green-800"
-        default:
-          return "bg-gray-100 text-gray-800"
-      }
-    }
-
-    const getStatusIcon = (status: string) => {
-      switch (status) {
-        case "open":
-          return <AlertCircle className="h-4 w-4" />
-        case "in_progress":
-          return <Clock className="h-4 w-4" />
-        case "resolved":
-          return <CheckCircle className="h-4 w-4" />
-        case "closed":
-          return <XCircle className="h-4 w-4" />
-        default:
-          return <AlertCircle className="h-4 w-4" />
-      }
-    }
-
-    const formatDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    }
-
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar user={user} />
-
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Button asChild variant="outline" size="sm">
-                <Link href={user.role === "user" ? "/tickets" : "/tickets/manage"}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tickets
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <Badge className={getStatusColor(ticket.status)} variant="secondary">
-                  {getStatusIcon(ticket.status)}
-                  <span className="ml-1">{ticket.status.replace("_", " ")}</span>
-                </Badge>
-                <Badge className={getPriorityColor(ticket.priority)} variant="outline">
-                  {ticket.priority} priority
-                </Badge>
-              </div>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900">{ticket.subject}</h1>
-            <p className="text-gray-600 mt-1">Ticket #{ticket.id.slice(0, 8)}</p>
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/tickets">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Tickets
+              </Link>
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Ticket Description */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Description</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose max-w-none">
-                    <p className="text-gray-700 whitespace-pre-wrap">{ticket.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Comments Section - Placeholder for future implementation */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Comments</CardTitle>
-                  <CardDescription>Communication history for this ticket</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p>No comments yet. Comments feature coming soon!</p>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{ticket.subject}</h1>
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span>Ticket #{ticket.id.slice(0, 8)}</span>
+                <span>Created {new Date(ticket.created_at).toLocaleDateString()}</span>
+                {ticket.updated_at !== ticket.created_at && (
+                  <span>Updated {new Date(ticket.updated_at).toLocaleDateString()}</span>
+                )}
+              </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Ticket Actions - Only for agents/admins */}
-              {["agent", "admin"].includes(user.role) && <TicketActions ticket={ticket} user={user} agents={agents} />}
-
-              {/* Ticket Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ticket Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-500">Status</span>
-                    <Badge className={getStatusColor(ticket.status)} variant="secondary">
-                      {ticket.status.replace("_", " ")}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-500">Priority</span>
-                    <Badge className={getPriorityColor(ticket.priority)} variant="outline">
-                      {ticket.priority}
-                    </Badge>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-2">
-                      <User className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-500">Created by</p>
-                        <p className="text-sm text-gray-900">{ticket.users?.full_name || "Unknown User"}</p>
-                        <p className="text-xs text-gray-500">{ticket.users?.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Users className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-500">Assigned to</p>
-                        <p className="text-sm text-gray-900">{ticket.assigned_agent?.full_name || "Unassigned"}</p>
-                        {ticket.assigned_agent?.email && (
-                          <p className="text-xs text-gray-500">{ticket.assigned_agent.email}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Tag className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-500">Category</p>
-                        <p className="text-sm text-gray-900">{ticket.categories?.name || "Uncategorized"}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-500">Created</p>
-                        <p className="text-sm text-gray-900">{formatDate(ticket.created_at)}</p>
-                      </div>
-                    </div>
-
-                    {ticket.updated_at !== ticket.created_at && (
-                      <div className="flex items-start gap-2">
-                        <Clock className="h-4 w-4 text-gray-400 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-500">Last updated</p>
-                          <p className="text-sm text-gray-900">{formatDate(ticket.updated_at)}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* User Actions - For ticket creators */}
-              {user.id === ticket.user_id && !["resolved", "closed"].includes(ticket.status) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Actions</CardTitle>
-                    <CardDescription>Actions you can perform on this ticket</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {ticket.status !== "resolved" && (
-                      <Button variant="outline" className="w-full bg-transparent" disabled>
-                        Mark as Resolved
-                        <span className="text-xs text-gray-500 ml-2">(Coming soon)</span>
-                      </Button>
-                    )}
-                    {ticket.status !== "closed" && (
-                      <Button variant="outline" className="w-full bg-transparent" disabled>
-                        Close Ticket
-                        <span className="text-xs text-gray-500 ml-2">(Coming soon)</span>
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(ticket.status)}>{ticket.status.replace("_", " ")}</Badge>
+              <Badge className={getPriorityColor(ticket.priority)}>{ticket.priority}</Badge>
             </div>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Ticket Description */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="whitespace-pre-wrap text-gray-700">{ticket.description}</div>
+              </CardContent>
+            </Card>
+
+            {/* Comments */}
+            <TicketComments ticketId={ticket.id} currentUser={user} ticketStatus={ticket.status} />
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Ticket Actions */}
+            {(user.role === "agent" || user.role === "admin") && <TicketActions ticket={ticket} />}
+
+            {/* Ticket Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Ticket Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <User className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">Created by</p>
+                    <p className="text-sm text-gray-600">{ticket.users?.full_name}</p>
+                  </div>
+                </div>
+
+                {ticket.users && (
+                  <div className="flex items-center gap-3">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm font-medium">Assigned to</p>
+                      <p className="text-sm text-gray-600">{ticket.users.full_name || "Unassigned"}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <Tag className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">Category</p>
+                    <p className="text-sm text-gray-600">{ticket.categories?.name || "Uncategorized"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">Priority</p>
+                    <Badge className={getPriorityColor(ticket.priority)} variant="secondary">
+                      {ticket.priority}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium">Created</p>
+                    <p className="text-sm text-gray-600">{new Date(ticket.created_at).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {ticket.updated_at !== ticket.created_at && (
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <div>
+                      <p className="text-sm font-medium">Last updated</p>
+                      <p className="text-sm text-gray-600">{new Date(ticket.updated_at).toLocaleString()}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-    )
-  } catch (error) {
-    console.error("Error in TicketDetailPage:", error)
-    notFound()
-  }
+    </div>
+  )
 }
