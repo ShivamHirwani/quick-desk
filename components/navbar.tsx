@@ -1,103 +1,182 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { LogOut } from "lucide-react"
-import type { User as UserType } from "@/lib/auth"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Home, Ticket, Settings, LogOut, BarChart3 } from "lucide-react"
 
 interface NavbarProps {
-  user: UserType
+  user: {
+    id: string
+    email: string
+    full_name: string
+    role: string
+  }
 }
 
 export function Navbar({ user }: NavbarProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
 
   const handleLogout = async () => {
-    setLoading(true)
     try {
-      await fetch("/api/auth/logout", { method: "POST" })
-      router.push("/login")
-      router.refresh()
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        router.push("/login")
+        router.refresh()
+      }
     } catch (error) {
-      console.error("Logout failed:", error)
-    } finally {
-      setLoading(false)
+      console.error("Logout error:", error)
     }
   }
 
   const getRoleColor = (role: string) => {
     switch (role) {
       case "admin":
-        return "bg-red-100 text-red-800"
+        return "bg-purple-100 text-purple-800"
       case "agent":
         return "bg-blue-100 text-blue-800"
+      case "user":
+        return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
   return (
-    <nav className="border-b bg-white">
+    <nav className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <Link href="/dashboard" className="text-xl font-bold text-gray-900">
-              QuickDesk
+        <div className="flex justify-between items-center py-4">
+          {/* Logo and Navigation */}
+          <div className="flex items-center space-x-8">
+            <Link href="/dashboard" className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Ticket className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">QuickDesk</span>
             </Link>
-            <div className="hidden md:ml-6 md:flex md:space-x-8">
-              <Link href="/dashboard" className="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                Dashboard
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-6">
+              <Link
+                href="/dashboard"
+                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <Home className="h-4 w-4" />
+                <span>Dashboard</span>
               </Link>
-              <Link href="/tickets" className="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                My Tickets
+
+              <Link
+                href="/tickets"
+                className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <Ticket className="h-4 w-4" />
+                <span>My Tickets</span>
               </Link>
-              <Link href="/tickets/new" className="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                New Ticket
-              </Link>
-              {(user.role === "agent" || user.role === "admin") && (
-                <Link href="/agent" className="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                  Agent Panel
-                </Link>
+
+              {["agent", "admin"].includes(user.role) && (
+                <>
+                  <Link
+                    href="/tickets/manage"
+                    className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Manage Tickets</span>
+                  </Link>
+                </>
               )}
+
               {user.role === "admin" && (
-                <Link href="/admin" className="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
-                  Admin
+                <Link
+                  href="/admin"
+                  className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Admin</span>
                 </Link>
               )}
             </div>
           </div>
 
+          {/* User Menu */}
           <div className="flex items-center space-x-4">
-            <Badge className={getRoleColor(user.role)}>{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</Badge>
+            <Button asChild>
+              <Link href="/tickets/new">Create Ticket</Link>
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>
-                      {user.full_name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
-                    </AvatarFallback>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src="/placeholder-user.jpg" alt={user.full_name} />
+                    <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
-                <div className="flex items-center justify-start gap-2 p-2">
-                  <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">{user.full_name}</p>
-                    <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium leading-none">{user.full_name}</p>
+                      <Badge className={getRoleColor(user.role)} variant="secondary">
+                        {user.role}
+                      </Badge>
+                    </div>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
-                </div>
-                <DropdownMenuItem onClick={handleLogout} disabled={loading}>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="flex items-center">
+                    <Home className="mr-2 h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/tickets" className="flex items-center">
+                    <Ticket className="mr-2 h-4 w-4" />
+                    <span>My Tickets</span>
+                  </Link>
+                </DropdownMenuItem>
+                {["agent", "admin"].includes(user.role) && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/tickets/manage" className="flex items-center">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      <span>Manage Tickets</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {user.role === "admin" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Admin Panel</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
